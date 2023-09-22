@@ -1,0 +1,221 @@
+#+TITLE:     elfeed-curate.el
+#+AUTHOR:    Robert Nadler
+#+EMAIL:     robert.nadler@gmail.com
+
+* Description :unfold:
+
+*elfeed-curate* is an add-on for [[https://github.com/skeeto/elfeed][elfeed]], an RSS reader for
+Emacs.
+
+The purpose of this package is to add the additional functionality needed to
+curate RSS feeds. It provides the capability to annotate feed entries and to
+publish entries grouped by their subject categories. =elfeed-curate= uses the
+available =elfeed= search functionality for marking, tagging, and filtering of
+feed entries. The new functions available to support the curation workflow are:
+
+*** Entry annotation
+- =elfeed-curate-edit-entry-annoation= (=a= key) adds the ability to create and
+  edit annotation text to an entry. Annotations can have org mode formatting and
+  are saved in the =elfeed= database. This function works in both search and
+  show mode.
+
+  When an annotation is added a custom tag (=elfeed-curate-annotation-tag=,
+  default is =ann=) is also added to the entry. This shows which entries have
+  annotations in the search window and can also be used as a filter (=s +ann=).
+*** Entry selection
+- =elfeed-curate-toggle-star= (=m= key) is a convenience function that allows
+  starring entries from the show buffer. See [[https://pragmaticemacs.wordpress.com/2016/09/16/star-and-unstar-articles-in-elfeed/][Star and unstar articles in elfeed]].
+  =elfeed-curate-star-tag= (default is =star=) can be used to change the tag
+  name.
+*** Publication (Exporting)
+- =elfeed-curate-export-entries= (=x= key) exports entries in the
+  =*elfeed-search*= buffer to the desired publication format (see
+  =elfeed-curate-org-export-backend=). The newly generated file is also opened
+  with the associated application (e.g. a browser for HTML). Exporting directly
+  to Hugo (Markdown plus Front matter) is also supported.
+
+  The subject categories are based on the entry tag names (see details below).
+*** Utilities
+- Use =M-x elfeed-curate-reconcile-annotations= to ensure all database entries
+  have the correct annotation tags.
+
+* Curation Workflow
+My preferred workflow is as follows:
+1. If an entry has *content of interest*, =star= (=m= key) it and add annotation
+   (=a= key) if desired.
+2. Select all starred entries (=s +star=) and export them (=x= key). This can be
+   repeated as often as is needed to ensure that the exported content is to your
+   liking.
+3. (optional) Previously published entries can be tracked by tagging all starred
+   entries with a new date-based publication tag (e.g. =+ pub_DDMMYY=).
+4. Remove all of the star tags (=m= key or =- star=).
+
+That's it. The Elfeed filtering capabilities can provide many other entry
+selection criteria (e.g. time-based), but so far I've found the workflow above
+to be simple and efficient.
+
+This is the elfeed search window showing the starred entries to be exported. The entries with annotations (=ann=) are highlighted.
+
+  [[screenshots/elfeed-curate-search-content.png]]
+  [[screenshots/elfeed-curate-export-content.png]]
+
+  The exported content (as HTML here) shows how entries are grouped (based on tag name) and some annotation examples.
+  The same content exported to Hugo is here: [[https://bobonmedicaldevicesoftware.com/coi/posts/21-sep-2023-export/][21-Sep-2023 Content of Interest]].
+
+* Prerequisites
+
+This package only depends on =org= and =elfeed= being installed.
+
+* Installation
+
+If you use MELPA, an easy way to install this package is via
+=package-install=. Alternatively, download =elfeed-curate.el=, put it in
+your =load-path= and =require= it.
+
+If you use both MELPA and =use-package=, you can use this, too:
+
+#+begin_src emacs-lisp
+(use-package elfeed-curate
+  :ensure
+  :after elfeed)
+#+end_src
+
+* Custom key bindings
+
+The *annotate* function works in both search and show modes while
+the *export* function works only in search mode.  The keys in
+the =elfeed-search-mode-map= and =elfeed-show-mode-map= maps can
+be bound as shown here:
+
+#+begin_src emacs-lisp
+(use-package elfeed-curate
+  :ensure
+  :bind (:map elfeed-search-mode-map
+              ("a" . elfeed-curate-edit-entry-annoation)
+              ("x" . elfeed-curate-export-entries))
+        (:map elfeed-show-mode-map
+              ("a" . elfeed-curate-edit-entry-annoation)
+              ("m" . elfeed-curate-toggle-star)
+              ("q" . kill-buffer-and-window)))
+#+end_src
+
+The [[https://github.com/doomemacs/doomemacs][Doom]] configuration would be:
+
+*** =packages.el=
+#+begin_src emacs-lisp
+;;...
+(package! elfeed-curate)
+;;...
+#+end_src
+
+*** =config.el=
+#+begin_src emacs-lisp
+(after! elfeed
+  ;; Your custom Elfeed configuration.
+  ;; elfeed-curate key bindings:
+  (define-key elfeed-search-mode-map "a" #'elfeed-curate-edit-entry-annoation)
+  (define-key elfeed-search-mode-map "x" #'elfeed-curate-export-entries)
+  (define-key elfeed-search-mode-map "m" #'elfeed-curate-toggle-star)
+
+  (define-key elfeed-show-mode-map   "a" #'elfeed-curate-edit-entry-annoation)
+  (define-key elfeed-show-mode-map   "m" #'elfeed-curate-toggle-star)
+  (define-key elfeed-show-mode-map   "q" #'kill-buffer-and-window))
+#+end_src
+I had issues closing the show window after the annotation buffer was displayed
+there. Not sure what the root cause was (is), but overriding the =q= key with
+=kill-buffer-and-window= seems to have solved the problem. This needs more
+investigation.
+
+
+*** Disclaimers
+
+- I have only tested this with Emacs 29.1, both bare-bones and with Doom. The
+  code is compatible back to Emacs 25.1 and Org/Elfeed are the only
+  dependencies, so there's a good chance this will work out of the box on most
+  modern systems.
+- Testing of the export backends has been limited to mostly HTML and Markdown.
+
+* Usage
+
+** Annotation Window
+
+Annotation edit window:
+[[screenshots/elfeed-curate-ann-window.png]]
+
+Exported annotation:
+
+[[screenshots/elfeed-curate-ann-export.png]]
+
+The =a= key (=elfeed-curate-edit-entry-annoation=) will display an org-mode
+buffer for managing annotation content. Annotation can be added, edited, and
+deleted for an entry from both the elfeed search and show windows. The
+annotation tag (=ann=) will be added or removed automatically.
+
+Most org-mode formatting will be exported properly, but may differ depending on
+the export format.
+
+The following key combinations are used to exit the annotation buffer:
+
+| Keys      | Action | Notes                                                                                       |
+|-----------+--------+---------------------------------------------------------------------------------------------|
+| =C-c C-c= | Save   | Saves the annotation content. If the annotation buffer is empty, the annotation is removed. |
+| =C-c C-d= | Delete | Delete the annotation content.                                                              |
+| =C-c C-k= | Abort  | Exit the annotation buffer without saving changes.                                          |
+
+** Export Behavior
+
+The =x= key (=elfeed-curate-export-entries=) takes the following actions:
+
+1. Groups all displayed or selected search entries based on their tagging.
+   * Tags are converted to group headings by replacing =_= characters with a
+     space and capitalizing all words. E.g. the =med_dev= tag becomes "Med Dev".
+   * If one or more authors are available from the feed, they will be listed
+     next to the link in parentheses: (Author 1, Author 2, ...).
+   * An entry will only be displayed in one group. If the entry is in multiple
+     groups, the other groups will be shown in bold brackets (*[Group 2, Group
+     3,...]*) next to the exported link.
+   * Use =elfeed-curate-no-group-tag= to determine how entries that do not
+     belong to any group are treated. By default, they are added to the "No
+     Category" group.
+   * By default, the count of each group is included in the group heading. If a
+     prefix argument is used before the export (=C-u x=), the count will not be
+     shown. The count can be permanently removed by setting
+     =elfeed-curate-show-group-count= to =nil=.
+2. The grouped content is exported to an =org= file (=elfeed-curate-export-dir=/export.org).
+   * Use =elfeed-curate-org-options= to specify custom org file options.
+3. The =export.org= file is then converted to the desired export format specified by
+   =elfeed-curate-org-export-backend=.
+4. The exported content is then displayed.
+   * If the format is Markdown (=md=) and =elfeed-curate-hugo-base-dir= is
+     specified the exported Markdown is written to the specified content section
+     (=elfeed-curate-hugo-section=). The Hugo development server will
+     automatically detect the change and display the new content.
+   * In all other cases, the exported content will attempt to be displayed via
+     =elfeed-curate--open-in-external-app= (=xdg-open= in most cases).
+
+* Customization
+
+Here are the variables that can be customized:
+
+| Variable                                    | Default                                                                    | Desc.                                                                                                                                                         |
+|---------------------------------------------+----------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| =elfeed-curate-title-length=                | 60                                                                         | Maximum length of the entry title to show in the annotation edit buffer.                                                                                      |
+| =elfeed-curate-annotation-key=              | :my/annotation                                                             | Elfeed database meta data key to store annotations.                                                                                                           |
+| =elfeed-curate-annotation-tag=              | 'ann                                                                       | Tag used to indicate that annotation has been added to an entry.                                                                                              |
+| =elfeed-curate-star-tag=                    | 'star                                                                      | Tag used to indicate that annotation has been `starred`.                                                                                                      |
+| =elfeed-curate-no-group-tag=                | 'no_category                                                               | Tag used to indicate that an entry has no group tag. The entry will be added to this group in the export. Set to nil to not display these entries.            |
+| =elfeed-curate-org-content-header-function= | #'elfeed-curate-org-content-header--default                                | Function used to create the header (options and title) content. The default is for HTML output.                                                               |
+| =elfeed-curate-org-title=                   | Content of Note                                                            | The TITLE part of the '<Date> <Title>' format. See the =elfeed-curate-org-content-header--default= function.                                                  |
+| =elfeed-curate-date-format=                 | "%d-%b-%Y"                                                                 | The date format used in the title.                                                                                                                            |
+| =elfeed-curate-org-options=                 | #html-style:nil toc:nil num:nil f:nil html-postamble:nil html-preamble:nil | Set org document format options. Default is for an HTML export: no styles, TOC, section numbering, footer.                                                    |
+| =elfeed-curate-export-dir=                  | ~/org                                                                      | Export the org and html content to this directory.                                                                                                            |
+| =elfeed-curate-org-export-backend=          | 'html                                                                      | Select export format. Can be one of:                                                                                                                          |
+|                                             |                                                                            | =ascii= - Export to plain ASCII text.                                                                                                                         |
+|                                             |                                                                            | =html= - Export to HTML.                                                                                                                                      |
+|                                             |                                                                            | =md= - Export to Markdown.                                                                                                                                    |
+|                                             |                                                                            | =odt= - Export to OpenDocument Text.                                                                                                                          |
+|                                             |                                                                            | =pdf= - Export to PDF (requires additional setup).                                                                                                            |
+| =elfeed-curate-group-exclude-tag-list=      | (list 'unread elfeed-curate-star-tag elfeed-curate-annotation-tag)         | List of tags to exclude from the group list. These are typically non-subject categories.                                                                      |
+| =elfeed-curate-show-group-count=            | t                                                                          | Flag to enable showing the count of each group in the exported output. If a prefix argument is used before the export (=C-u x=), the count will not be shown. |
+| =elfeed-curate-hugo-base-dir=               | nil                                                                        | Base directory of the Hugo project. Used for 'md exports.                                                                                                     |
+| =elfeed-curate-hugo-section=                | "posts"                                                                    | Hugo section name. Posts will be written to elfeed-curate-hugo-base-dir/content/<section>.                                                                    |
