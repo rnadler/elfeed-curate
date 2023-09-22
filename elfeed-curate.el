@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Robert Nadler <robert.nadler@gmail.com>
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
-;; Version: 0.0.1
+;; Version: 0.1.0
 ;; Package-Requires: ((emacs "25.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
@@ -243,8 +243,10 @@ draft = false
 
 (defun elfeed-curate--show-entry (msg entry tag)
   "DEBUG: Show an ENTRY with MSG. Use:
-(add-hook 'elfeed-tag-hooks (lambda (entry tag) (elfeed-curate--show-entry \"Add tag\" (car entry) tag)))
-(add-hook 'elfeed-untag-hooks  (lambda (entry tag) (elfeed-curate--show-entry \"Remove tag\" (car entry) tag)))"
+\(add-hook 'elfeed-tag-hooks (lambda (entry tag)
+   (elfeed-curate--show-entry \"Add tag\" (car entry) tag)))
+\(add-hook 'elfeed-untag-hooks  (lambda (entry tag)
+   (elfeed-curate--show-entry \"Remove tag\" (car entry) tag)))"
   (let ((title (if (null entry) "?" (elfeed-entry-title entry)))
         (tags  (if (null entry) "?" (elfeed-entry-tags entry))))
     (message "%s %s: %s tags: %s" msg tag title tags)))
@@ -268,8 +270,8 @@ draft = false
 (defun  elfeed-curate-add-org-entry (entry group)
   "Add an elfeed ENTRY in GROUP to the org buffer."
   (let* ((annotation (elfeed-curate-get-entry-annotation entry))
-         (authors (elfeed-curate-concat-authors entry))
-         (authors-str (if (= (length authors) 0) "" (concat " (" authors ")")))
+         (author-list (elfeed-curate-concat-authors entry))
+         (authors-str (if (= (length author-list) 0) "" (concat " (" author-list ")")))
          (other-groups (elfeed-curate-concat-other-groups entry group))
          (groups-str (if (= (length other-groups) 0) "" (concat " **[" other-groups "]**"))))
     (insert (format "- [[%s][%s]]%s%s\n"
@@ -283,7 +285,7 @@ draft = false
 
 (defun elfeed-curate-tag-to-group-name (tag)
   "Convert TAG to a human readable title string.
-Split on '_' and capitalize each word. e.g. tag_name --> Tag Name"
+Split on '_' and capitalize each word. e.g. tag_name `-->' Tag Name"
   (capitalize (replace-regexp-in-string "_" " " (format "%s" tag))))
 
 (defun elfeed-curate-add-org-group (group entries show-group-count)
