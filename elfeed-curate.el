@@ -206,7 +206,7 @@ date = '%s'
 draft = false
 +++\n"
             (elfeed-curate-current-date-string) title
-            (format-time-string "%Y-%m-%dT%T%z" (current-time)))))
+            (format-time-string "%FT%T%z" (current-time)))))
 
 (defun elfeed-curate--hugo-post-process (file)
   "Add Hugo toml header to md FILE."
