@@ -86,7 +86,8 @@ See the `elfeed-curate-org-content-header--default` function."
   :type 'string)
 
 (defcustom elfeed-curate-org-options "html-style:nil toc:nil num:nil f:nil html-postamble:nil html-preamble:nil"
-  "Set format options. Default is for an HTML export: no styles, TOC, section numbering, footer."
+  "Set format options.
+Default is for an HTML export: no styles, section numbering, footer."
   :group 'elfeed-curate
   :type 'string)
 
@@ -97,7 +98,8 @@ See the `elfeed-curate-org-content-header--default` function."
 
 (defcustom elfeed-curate-show-group-count t
   "Flag to enable showing the count of each group in the exported output.
-If a prefix argument is used before the export (`C-u x`), the count will not be shown."
+If a prefix argument is used before the export (`C-u x`),
+the count will not be shown."
   :group 'elfeed-curate
   :type 'boolean)
 
@@ -119,12 +121,13 @@ These are typically non-subject categories."
   :type '(repeat symbol))
 
 (defcustom elfeed-curate-hugo-base-dir nil
-  "Base directory of the Hugo project. Used for 'md exports."
+  "Base directory of the Hugo project. Used for Markdown exports."
   :group 'elfeed-curate
   :type 'directory)
 
 (defcustom elfeed-curate-hugo-section "posts"
-  "Hugo section name. Posts will be written to elfeed-curate-hugo-base-dir/content/<section>."
+  "Hugo section name.
+Posts will be written to elfeed-curate-hugo-base-dir/content/<section>."
   :group 'elfeed-curate
   :type 'string)
 
@@ -229,7 +232,8 @@ draft = false
      (lambda (author) (plist-get author :name)) authors ", ")))
 
 (defun elfeed-curate-concat-other-groups (entry group)
-  "Return a string of all other groups (not GROUP) concatenated for the given ENTRY."
+  "Return a string of all other groups (not GROUP)
+concatenated for the given ENTRY."
   (let* ((tags (copy-sequence (elfeed-entry-tags entry)))
          (tags (delq group tags))
          (tags (cl-remove-if (lambda (tag) (memq tag elfeed-curate-group-exclude-tag-list)) tags)))
@@ -242,11 +246,8 @@ draft = false
     (if annotation annotation "")))
 
 (defun elfeed-curate--show-entry (msg entry tag)
-  "DEBUG: Show an ENTRY with MSG. Use:
-\(add-hook 'elfeed-tag-hooks (lambda (entry tag)
-   (elfeed-curate--show-entry \"Add tag\" (car entry) tag)))
-\(add-hook 'elfeed-untag-hooks  (lambda (entry tag)
-   (elfeed-curate--show-entry \"Remove tag\" (car entry) tag)))"
+  "DEBUG: Show an ENTRY with MSG.
+Add a hook to either `elfeed-tag-hooks` or `elfeed-untag-hooks`"
   (let ((title (if (null entry) "?" (elfeed-entry-title entry)))
         (tags  (if (null entry) "?" (elfeed-entry-tags entry))))
     (message "%s %s: %s tags: %s" msg tag title tags)))
@@ -337,7 +338,7 @@ Show the group count if SHOW-GROUP-COUNT is not nil."
 
 (defun elfeed-curate--group-entries-count (groups)
   "Count total entries in all GROUPS."
-  (apply '+ (mapcar (lambda (key) (length (plist-get groups key)))
+  (apply #'+ (mapcar (lambda (key) (length (plist-get groups key)))
                     (elfeed-curate-plist-keys groups))))
 
 (defun elfeed-curate--annotation-keymap ()
@@ -363,7 +364,7 @@ Returns the annotation buffer content."
   (with-temp-buffer
     (org-mode)
     (setq buffer-read-only nil)
-    (hide-mode-line-mode)
+    (setq mode-line-format nil)
     (outline-show-all)
     (rename-buffer elfeed-curate-capture-buffer-name t)
     (insert default-string)
@@ -401,7 +402,7 @@ Simplified version of: `http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
         (mapc
          (lambda (x)
            (message "%s" x)
-           (apply 'start-process (append (list "xah open in external app" xoutBuf) xcmdlist (list (format "'%s'" (if (string-match "'" x) (replace-match "`'" t t x) x))) nil)))
+           (apply #'start-process (append (list "xah open in external app" xoutBuf) xcmdlist (list (format "'%s'" (if (string-match "'" x) (replace-match "`'" t t x) x))) nil)))
          xfileList)))
      ((string-equal system-type "darwin")
       (mapc (lambda (xfpath) (shell-command (concat "open " (shell-quote-argument xfpath)))) xfileList))
@@ -442,7 +443,8 @@ Simplified version of: `http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
 
 ;;;###autoload
 (defun elfeed-curate-toggle-star ()
-  "Toggle `elfeed-curate-star-tag' on the current entry in either the search or show buffer."
+  "Toggle `elfeed-curate-star-tag' on the current entry.
+This work in either the search or show buffer."
   (interactive)
   (let* ((entry (elfeed-curate--get-entry))
          (add-tag (not (memq elfeed-curate-star-tag (elfeed-entry-tags entry)))))
