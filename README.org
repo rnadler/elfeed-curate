@@ -80,7 +80,7 @@ If you use both MELPA and =use-package=, you can use this, too:
   :after elfeed)
 #+end_src
 
-* Custom key bindings
+** Custom key bindings
 
 The *annotate* function works in both search and show modes while
 the *export* function works only in search mode.  The keys in
@@ -99,7 +99,7 @@ be bound as shown here:
               ("q" . kill-buffer-and-window)))
 #+end_src
 
-The [[https://github.com/doomemacs/doomemacs][Doom]] configuration would be:
+** [[https://github.com/doomemacs/doomemacs][Doom]] configuration
 
 *** =packages.el=
 #+begin_src emacs-lisp
@@ -127,7 +127,7 @@ there. Not sure what the root cause was (is), but overriding the =q= key with
 investigation.
 
 
-*** Disclaimers
+** Disclaimers
 
 - I have only tested this with Emacs 29.1, both bare-bones and with Doom. The
   code is compatible back to Emacs 25.1 and Org/Elfeed are the only
@@ -166,29 +166,37 @@ The following key combinations are used to exit the annotation buffer:
 
 The =x= key (=elfeed-curate-export-entries=) takes the following actions:
 
-1. Groups all displayed or selected search entries based on their tagging.
+1. All displayed or selected search entries are grouped based on their tagging.
    * Tags are converted to group headings by replacing =_= characters with a
      space and capitalizing all words. E.g. the =med_dev= tag becomes "Med Dev".
+   * Tags to be excluded from the subject categories are specified in
+     =elfeed-curate-group-exclude-tag-list=. Non-subject group tags should be
+     added to this list.
    * If one or more authors are available from the feed, they will be listed
      next to the link in parentheses: (Author 1, Author 2, ...).
    * An entry will only be displayed in one group. If the entry is in multiple
      groups, the other groups will be shown in bold brackets (*[Group 2, Group
      3,...]*) next to the exported link.
    * Use =elfeed-curate-no-group-tag= to determine how entries that do not
-     belong to any group are treated. By default, they are added to the "No
-     Category" group.
+     belong to any group are treated. I.e. there are no tags left after removing
+     the excluded list tags (above). By default, they are added to the "No
+     Category" group. Set to nil to not display these entries.
    * By default, the count of each group is included in the group heading. If a
      prefix argument is used before the export (=C-u x=), the count will not be
      shown. The count can be permanently removed by setting
      =elfeed-curate-show-group-count= to =nil=.
-2. The grouped content is exported to an =org= file (=elfeed-curate-export-dir=/export.org).
+2. The grouped content is exported to an =org= file (*export.org* in the
+   =elfeed-curate-export-dir= directory).
    * Use =elfeed-curate-org-options= to specify custom org file options.
-3. The =export.org= file is then converted to the desired export format specified by
-   =elfeed-curate-org-export-backend=.
+   * The =elfeed-curate-org-content-header-function= can be used to customize
+     all org file header content.
+3. The =export.org= file is then converted to the desired export format
+   specified by =elfeed-curate-org-export-backend=. A date-stamped export file
+   with the selected backend extension (=.md=, =.html=, etc.) is created.
 4. The exported content is then displayed.
    * If the format is Markdown (=md=) and =elfeed-curate-hugo-base-dir= is
-     specified the exported Markdown is written to the specified content section
-     (=elfeed-curate-hugo-section=). The Hugo development server will
+     specified the exported date-stamped Markdown file is written to the specified content
+     section (=elfeed-curate-hugo-section=). The Hugo development server will
      automatically detect the change and display the new content.
    * In all other cases, the exported content will attempt to be displayed via
      =elfeed-curate--open-in-external-app= (=xdg-open= in most cases).
