@@ -400,27 +400,28 @@ Returns the annotation buffer content."
 
 (defun elfeed-curate--open-in-external-app (fname)
   "Open FNAME in external app.
-Simplified version of: `http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_ext_apps.html`"
+Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_ext_apps.html>"
   (interactive)
-  (let ((xfileList (list (expand-file-name fname))))
+  (let ((file-list (list (expand-file-name fname))))
     (cond
      ((string-equal system-type "windows-nt")
-      (let ((xoutBuf (get-buffer-create "*xah open in external app*"))
-            (xcmdlist (list "PowerShell" "-Command" "Invoke-Item" "-LiteralPath")))
+      (let ((out-buf (get-buffer-create "*elfeed-curate open in external app*"))
+            (cmd-list (list "PowerShell" "-Command" "Invoke-Item" "-LiteralPath")))
         (mapc
          (lambda (x)
            (message "%s" x)
-           (apply #'start-process (append (list "xah open in external app" xoutBuf) xcmdlist (list (format "'%s'" (if (string-match "'" x) (replace-match "`'" t t x) x))) nil)))
-         xfileList)))
+           (apply #'start-process (append (list "xah open in external app" out-buf) cmd-list
+                                          (list (format "'%s'" (if (string-match "'" x) (replace-match "`'" t t x) x))) nil)))
+         file-list)))
      ((string-equal system-type "darwin")
-      (mapc (lambda (xfpath) (shell-command (concat "open " (shell-quote-argument xfpath)))) xfileList))
+      (mapc (lambda (file-path) (shell-command (concat "open " (shell-quote-argument file-path)))) file-list))
      ((string-equal system-type "gnu/linux")
-      (mapc (lambda (xfpath)
+      (mapc (lambda (file-path)
               (call-process shell-file-name nil 0 nil
                             shell-command-switch
-                            (format "%s %s" "xdg-open" (shell-quote-argument xfpath)))) xfileList))
+                            (format "%s %s" "xdg-open" (shell-quote-argument file-path)))) file-list))
      ((string-equal system-type "berkeley-unix")
-      (mapc (lambda (xfpath) (let ((process-connection-type nil)) (start-process "" nil "xdg-open" xfpath))) xfileList)))))
+      (mapc (lambda (file-path) (let ((process-connection-type nil)) (start-process "" nil "xdg-open" file-path))) file-list)))))
 
 ;;;###autoload
 (defun elfeed-curate-reconcile-annotations ()
@@ -446,7 +447,7 @@ Simplified version of: `http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
          ((and has-tag (not has-ann))
           (cl-incf remove-count)
           (elfeed-curate--update-tag entry elfeed-curate-annotation-tag nil)))))
-    (message "Annotation tags reconciled for %d entries: %d added, %d removed, %d total annoations"
+    (message "Annotation tags reconciled for %d entries: %d added, %d removed, %d total."
                      total-count add-count remove-count ann-count)))
 
 ;;;###autoload
