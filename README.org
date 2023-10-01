@@ -46,13 +46,15 @@ My preferred workflow is as follows:
 2. Select all starred entries (=s +star=) and export them (=x= key). This can be
    repeated as often as is needed to ensure that the exported content is to your
    liking.
-3. (optional) Previously published entries can be tracked by tagging all starred
+3. Publish exported content.
+4. (optional) Previously published entries can be tracked by tagging all starred
    entries with a new date-based publication tag (e.g. =+ pub_DDMMYY=).
-4. Remove all of the star tags (=m= key or =- star=).
+5. Remove all of the star tags (=m= key or =- star=).
 
 That's it. The Elfeed filtering capabilities can provide many other entry
-selection criteria (e.g. time-based), but so far I've found the workflow above
-to be simple and efficient.
+selection criteria (e.g. time-based), but so far I've found that specifically
+tagging selected entries /independent/ of their subject matter to be simple and
+efficient.
 
 This is the elfeed search window showing the starred entries to be exported. The entries with annotations (=ann=) are highlighted.
 
@@ -166,7 +168,7 @@ The following key combinations are used to exit the annotation buffer:
 
 The =x= key (=elfeed-curate-export-entries=) takes the following actions:
 
-1. All displayed or selected search entries are grouped based on their tagging.
+1. All displayed or selected search entries are grouped based on their *subject matter* tagging.
    * Tags are converted to group headings by replacing =_= characters with a
      space and capitalizing all words. E.g. the =med_dev= tag becomes "Med Dev".
    * Tags to be excluded from the subject categories are specified in
