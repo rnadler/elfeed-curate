@@ -2,7 +2,7 @@
 #+AUTHOR:    Robert Nadler
 #+EMAIL:     robert.nadler@gmail.com
 
-[[https://melpa.org/#/elfeed-curate][file:https://melpa.org/packages/elfeed-curate-badge.svg]]  [[https://github.com/rnadler/elfeed-curate/actions/workflows/melpazoid.yml/badge.svg][Melpazoid]]
+[[https://melpa.org/#/elfeed-curate][file:https://melpa.org/packages/elfeed-curate-badge.svg]]  [[https://github.com/rnadler/elfeed-curate/actions/workflows/melpazoid.yml/badge.svg]]
 
 * Description :unfold:
 
