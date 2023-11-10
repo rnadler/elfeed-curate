@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Robert Nadler <robert.nadler@gmail.com>
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "25.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
@@ -283,14 +283,17 @@ Add a hook to either `elfeed-tag-hooks` or `elfeed-untag-hooks`"
          (authors-str (if (= (length author-list) 0) "" (concat " (" author-list ")")))
          (other-groups (elfeed-curate-concat-other-groups entry group))
          (groups-str (if (= (length other-groups) 0) "" (concat " **[" other-groups "]**"))))
-    (insert (format "- [[%s][%s]]%s%s\n"
-                    (elfeed-entry-link entry)
-                    (elfeed-entry-title entry)
-                    authors-str groups-str))
-    (when (> (length annotation) 0)
-      ; Try to keep annotation content under the entry link.
-      (insert (format "  %s\n"
-                      (replace-regexp-in-string "\n" "\n  " annotation))))))
+    (if (string-match "<\\(.*\\)>" annotation)
+        (insert (format "- %s%s\n" (match-string 1 annotation) groups-str))
+      (progn
+        (insert (format "- [[%s][%s]]%s%s\n"
+                        (elfeed-entry-link entry)
+                        (elfeed-entry-title entry)
+                        authors-str groups-str))
+        (when (> (length annotation) 0)
+          ; Try to keep annotation content under the entry link.
+          (insert (format "  %s\n"
+                          (replace-regexp-in-string "\n" "\n  " annotation))))))))
 
 (defun elfeed-curate-tag-to-group-name (tag)
   "Convert TAG to a human readable title string.

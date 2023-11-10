@@ -156,6 +156,15 @@ annotation tag (=ann=) will be added or removed automatically.
 Most org-mode formatting will be exported properly, but may differ depending on
 the export format.
 
+Surrounding annotation text with angle brackets =< text >= allows you to
+override the original entry link and author(s). Everything outside of the angle
+brackets will be ignored. This is handy for adding an arbitrary link that is not
+currently in your feed list. The entry tags remain unchanged so you can decide
+which group(s) the entry should be in. A link override example would typically
+look like this:
+
+<[[http://link_url][Link Name]] (Author Name) =Interesting stuff.=>
+
 The following key combinations are used to exit the annotation buffer:
 
 | Keys      | Action | Notes                                                                                       |
