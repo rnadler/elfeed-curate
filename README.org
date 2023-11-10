@@ -2,6 +2,8 @@
 #+AUTHOR:    Robert Nadler
 #+EMAIL:     robert.nadler@gmail.com
 
+[[https://melpa.org/#/elfeed-curate][file:https://melpa.org/packages/elfeed-curate-badge.svg]]  [[https://github.com/rnadler/elfeed-curate/actions/workflows/melpazoid.yml/badge.svg]]
+
 * Description :unfold:
 
 *elfeed-curate* is an add-on for [[https://github.com/skeeto/elfeed][elfeed]], an RSS reader for
@@ -227,7 +229,7 @@ Here are the variables that can be customized:
 | =elfeed-curate-org-title=                   | Content of Note                                                            | The TITLE part of the '<Date> <Title>' format. See the =elfeed-curate-org-content-header--default= function.                                                  |
 | =elfeed-curate-date-format=                 | "%d-%b-%Y"                                                                 | The date format used in the title.                                                                                                                            |
 | =elfeed-curate-org-options=                 | #html-style:nil toc:nil num:nil f:nil html-postamble:nil html-preamble:nil | Set org document format options. Default is for an HTML export: no styles, TOC, section numbering, footer.                                                    |
-| =elfeed-curate-export-dir=                  | ~/org                                                                      | Export the org and html content to this directory.                                                                                                            |
+| =elfeed-curate-export-dir=                  | ~/org                                                                      | Write the .org file and exported content to this directory.                                                                                                   |
 | =elfeed-curate-org-export-backend=          | 'html                                                                      | Select export format. Can be one of:                                                                                                                          |
 |                                             |                                                                            | =ascii= - Export to plain ASCII text.                                                                                                                         |
 |                                             |                                                                            | =html= - Export to HTML.                                                                                                                                      |
