@@ -16,6 +16,9 @@
 (ert-deftest count-group-ertries-test ()
   (should (= 7 (elfeed-curate--group-entries-count groups))))
 
+(ert-deftest normalize-tags-test ()
+  (should (= 2 (length (elfeed-curate-normalize-tags (list 'soft 'Soft 'sofT 'med_dev 'med_Dev 'MED_Dev))))))
+
 (provide 'elfeed-curate-tests)
 
 ;;; elfeed-curate-tests.el ends here

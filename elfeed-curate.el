@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Robert Nadler <robert.nadler@gmail.com>
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((emacs "25.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
@@ -239,12 +239,28 @@ draft = false
     (mapconcat
      (lambda (author) (plist-get author :name)) authors ", ")))
 
+(defun elfeed-curate-normalize-one-tag (tag)
+  "Normalize one TAG."
+  (intern (downcase (symbol-name tag))))
+
+(defun elfeed-curate-normalize-tags (tags)
+  "Return the TAGS list without semantic duplicates."
+  (delete-dups (mapcar (lambda (tag) (elfeed-curate-normalize-one-tag tag)) tags)))
+
+(defun elfeed-curate-entry-tags (entry)
+  "Get normalized tags for ENTRY."
+  (elfeed-curate-normalize-tags (elfeed-entry-tags entry)))
+
+(defun elfeed-curate-exclude-list()
+  "Get normalized exclude list tags."
+  (elfeed-curate-normalize-tags elfeed-curate-group-exclude-tag-list))
+
 (defun elfeed-curate-concat-other-groups (entry group)
   "Return a string of all other groups (not GROUP)
 concatenated for the given ENTRY."
-  (let* ((tags (copy-sequence (elfeed-entry-tags entry)))
-         (tags (delq group tags))
-         (tags (cl-remove-if (lambda (tag) (memq tag elfeed-curate-group-exclude-tag-list)) tags)))
+  (let* ((tags (elfeed-curate-entry-tags entry))
+         (tags (delq (elfeed-curate-normalize-one-tag group) tags))
+         (tags (cl-remove-if (lambda (tag) (memq tag (elfeed-curate-exclude-list))) tags)))
     (mapconcat
      (lambda (tag) (elfeed-curate-tag-to-group-name tag)) tags ", ")))
 
@@ -320,10 +336,10 @@ Show the group count if SHOW-GROUP-COUNT is not nil."
     (interactive)
     (let ((entry-list ()))
       (with-elfeed-db-visit (entry _)
-        (let ((tags (elfeed-entry-tags entry))
+        (let ((tags (elfeed-curate-entry-tags entry))
               (pushed))
         (cl-dolist (tag tags)
-          (when (not (memq tag elfeed-curate-group-exclude-tag-list))
+          (when (not (memq tag (elfeed-curate-exclude-list)))
             (progn
               (setq pushed t)
               (cl-return))))
@@ -335,10 +351,10 @@ Show the group count if SHOW-GROUP-COUNT is not nil."
   "Create a plist of grouped ENTRIES."
   (let (groups)
     (dolist (entry entries)
-      (let ((tags (elfeed-entry-tags entry))
+      (let ((tags (elfeed-curate-entry-tags entry))
             (pushed))
         (cl-dolist (tag tags)
-          (when (not (memq tag elfeed-curate-group-exclude-tag-list))
+          (when (not (memq tag (elfeed-curate-exclude-list)))
             (progn
               (elfeed-curate--add-entry-to-group groups entry tag)
               (setq pushed t)
@@ -459,7 +475,7 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
 This work in either the search or show buffer."
   (interactive)
   (let* ((entry (elfeed-curate--get-entry))
-         (add-tag (not (memq elfeed-curate-star-tag (elfeed-entry-tags entry)))))
+         (add-tag (not (memq elfeed-curate-star-tag (elfeed-curate-entry-tags entry)))))
     (elfeed-curate--update-tag entry elfeed-curate-star-tag add-tag)))
 
 ;;;###autoload
