@@ -4,7 +4,7 @@
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
 ;; Version: 0.3.0
-;; Package-Requires: ((emacs "25.1") (elfeed "3.4.1"))
+;; Package-Requires: ((emacs "27.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
 
@@ -494,15 +494,15 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
   "Prompt gptel with USER-PROMPT about the current ENTRY."
   (interactive)
   (when (not (require 'gptel-request nil 'noerror))
-    (user-error "Elfeed-curate-ask-gptel: gptel-request package is not available!"))
+    (user-error "elfeed-curate-ask-gptel: gptel-request package is not available!"))
   (setq entry (or entry (elfeed-curate--get-entry)))
   (when (not entry)
-    (user-error "Elfeed-curate-ask-gptel: No feed entry found!"))
+    (user-error "elfeed-curate-ask-gptel: No feed entry found!"))
   (setq user-prompt (or user-prompt (read-string "Ask gptel: "
                                                  elfeed-curate-gptel-prompt--default
                                                  elfeed-curate-gptel-history)))
   (when (string= user-prompt "")
-    (user-error "Elfeed-curate-ask-gptel: A prompt is required!"))
+    (user-error "elfeed-curate-ask-gptel: A prompt is required!"))
 
   (let* ((entry-link (elfeed-entry-link entry))
          (authors-str (elfeed-curate--concat-authors entry))
@@ -512,13 +512,13 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
                    (substring text 0 elfeed-curate-url-content-length-max) text))
          (prompt (format "%s:\n%s\n%s" user-prompt entry-title text)))
     (when (= (length text) 0)
-      (user-error (format "Elfeed-curate-ask-gptel: Unable to get data from URL: %s" entry-link)))
+      (user-error (format "elfeed-curate-ask-gptel: Unable to get data from URL: %s" entry-link)))
     (gptel-request
         prompt
       :callback
       (lambda (response info)
         (if (not response)
-            (message "Elfeed-curate-ask-gptel failed: %s" (plist-get info :status))
+            (message "elfeed-curate-ask-gptel failed: %s" (plist-get info :status))
           (let* ((name "*ask-gptel*")
                  (out-buf (get-buffer-create name)))
             (with-current-buffer out-buf
@@ -532,8 +532,7 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
                         '((side . bottom)
                           (slot . 0)
                           (window-height . 0.25)
-                          (window-parameters . ((no-other-window . t)
-                                                (no-delete-other-windows . t)))))))
+                          (window-parameters . ((no-other-window . t)))))))
               (when (window-live-p win)
                 (set-window-dedicated-p win t)))
             (kill-new response)))))))
