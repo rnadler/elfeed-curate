@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Robert Nadler <robert.nadler@gmail.com>
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
-;; Version: 0.2.1
+;; Version: 0.3.0
 ;; Package-Requires: ((emacs "25.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
@@ -40,6 +40,9 @@
 (require 'cl-lib)
 (require 'elfeed)
 (require 'org)
+(require 'url)
+(require 'dom)
+(require 'shr)
 
 ;;; Code:
 
@@ -87,6 +90,16 @@ The default is for HTML output."
 See the `elfeed-curate-org-content-header--default` function."
   :group 'elfeed-curate
   :type 'string)
+
+(defcustom elfeed-curate-gptel-prompt--default "Write a one sentence summary about this article"
+  "The gptel prompt about the current entry."
+  :group 'elfeed-curate
+  :type 'string)
+
+(defcustom elfeed-curate-url-content-length-max 12000
+  "Maximum length of a URLs contents."
+  :group 'elfeed-curate
+  :type 'integer)
 
 (defcustom elfeed-curate-date-format "%d-%b-%Y"
   "The date format used in the title."
@@ -155,6 +168,9 @@ Posts will be written to elfeed-curate-hugo-base-dir/content/<section>."
 
 (defvar elfeed-curate-capture-buffer-name "*elfeed-curate-annotation*"
   "Annotation capture buffer name.")
+
+(defvar elfeed-curate-gptel-history nil
+  "History of gptel request prompts.")
 
 ;;; Functions:
 
@@ -233,11 +249,12 @@ draft = false
           elfeed-curate-org-options
           (elfeed-curate-current-date-string) title))
 
-(defun elfeed-curate-concat-authors (entry)
+(defun elfeed-curate--concat-authors (entry)
   "Return a string of all authors concatenated for the given ENTRY."
-  (let ((authors (elfeed-meta entry :authors)))
-    (mapconcat
-     (lambda (author) (plist-get author :name)) authors ", ")))
+  (let* ((authors (elfeed-meta entry :authors))
+         (author-list (mapconcat
+                       (lambda (author) (plist-get author :name)) authors ", ")))
+    (if (= (length author-list) 0) "" (concat " (" author-list ")"))))
 
 (defun elfeed-curate-normalize-one-tag (tag)
   "Normalize one TAG."
@@ -295,8 +312,7 @@ Add a hook to either `elfeed-tag-hooks` or `elfeed-untag-hooks`"
 (defun  elfeed-curate-add-org-entry (entry group)
   "Add an elfeed ENTRY in GROUP to the org buffer."
   (let* ((annotation (elfeed-curate-get-entry-annotation entry))
-         (author-list (elfeed-curate-concat-authors entry))
-         (authors-str (if (= (length author-list) 0) "" (concat " (" author-list ")")))
+         (authors-str (elfeed-curate--concat-authors entry))
          (other-groups (elfeed-curate-concat-other-groups entry group))
          (groups-str (if (= (length other-groups) 0) "" (concat " **[" other-groups "]**"))))
     (if (string-match "<\\(.*\\)>" annotation)
@@ -441,6 +457,86 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
                             (format "%s %s" "xdg-open" (shell-quote-argument file-path)))) file-list))
      ((string-equal system-type "berkeley-unix")
       (mapc (lambda (file-path) (let ((process-connection-type nil)) (start-process "" nil "xdg-open" file-path))) file-list)))))
+
+(defun elfeed-curate--url->text (url)
+  "Retrieve URL contents as text."
+  (let ((pop-up-windows nil)
+        (inhibit-message t)
+        (display-buffer-overriding-action '((display-buffer-no-window))))
+    (save-window-excursion
+      (let ((buf (url-retrieve-synchronously url t t 15))
+            text)
+        (unless buf (error (concat "elfeed-curate--url->text: Failed to fetch URL: " url)))
+        (unwind-protect
+            (with-current-buffer buf
+              (goto-char (point-min))
+              (unless (search-forward "\n\n" nil t)
+                (error (concat "elfeed-curate--url->text:: No HTTP body in URL:" url)))
+              (let* ((dom (and (fboundp 'libxml-parse-html-region)
+                               (libxml-available-p)
+                               (libxml-parse-html-region (point) (point-max)))))
+                    (setq text
+                          (string-trim
+                           (if dom
+                               (with-temp-buffer
+                                 (let ((shr-width 10000)
+                                       (shr-use-fonts nil)
+                                       (shr-inhibit-images t))
+                                   (shr-insert-document dom))
+                                 (buffer-string))
+                             (buffer-substring-no-properties (point) (point-max)))))))
+          (when (buffer-live-p buf) (kill-buffer buf)))
+        ;;(message (format "elfeed-curate--url->text: Read %d bytes from %s" (length text) url))
+        text))))
+
+;;;###autoload
+(defun elfeed-curate-ask-gptel (&optional user-prompt entry)
+  "Prompt gptel with USER-PROMPT about the current ENTRY."
+  (interactive)
+  (when (not (require 'gptel-request nil 'noerror))
+    (user-error "Elfeed-curate-ask-gptel: gptel-request package is not available!"))
+  (setq entry (or entry (elfeed-curate--get-entry)))
+  (when (not entry)
+    (user-error "Elfeed-curate-ask-gptel: No feed entry found!"))
+  (setq user-prompt (or user-prompt (read-string "Ask gptel: "
+                                                 elfeed-curate-gptel-prompt--default
+                                                 elfeed-curate-gptel-history)))
+  (when (string= user-prompt "")
+    (user-error "Elfeed-curate-ask-gptel: A prompt is required!"))
+
+  (let* ((entry-link (elfeed-entry-link entry))
+         (authors-str (elfeed-curate--concat-authors entry))
+         (entry-title (concat (elfeed-entry-title entry) authors-str))
+         (text (elfeed-curate--url->text entry-link))
+         (text (if (> (length text) elfeed-curate-url-content-length-max)
+                   (substring text 0 elfeed-curate-url-content-length-max) text))
+         (prompt (format "%s:\n%s\n%s" user-prompt entry-title text)))
+    (when (= (length text) 0)
+      (user-error (format "Elfeed-curate-ask-gptel: Unable to get data from URL: %s" entry-link)))
+    (gptel-request
+        prompt
+      :callback
+      (lambda (response info)
+        (if (not response)
+            (message "Elfeed-curate-ask-gptel failed: %s" (plist-get info :status))
+          (let* ((name "*ask-gptel*")
+                 (out-buf (get-buffer-create name)))
+            (with-current-buffer out-buf
+              (let ((inhibit-read-only t))
+                (erase-buffer)
+                (insert (format "Prompt: %s: %s\n%s\n\n" user-prompt entry-link entry-title))
+                (insert response)
+                (special-mode)))
+            (let ((win (display-buffer-in-side-window
+                        out-buf
+                        '((side . bottom)
+                          (slot . 0)
+                          (window-height . 0.25)
+                          (window-parameters . ((no-other-window . t)
+                                                (no-delete-other-windows . t)))))))
+              (when (window-live-p win)
+                (set-window-dedicated-p win t)))
+            (kill-new response)))))))
 
 ;;;###autoload
 (defun elfeed-curate-reconcile-annotations ()
