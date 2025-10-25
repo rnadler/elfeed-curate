@@ -91,7 +91,7 @@ See the `elfeed-curate-org-content-header--default` function."
   :group 'elfeed-curate
   :type 'string)
 
-(defcustom elfeed-curate-gptel-prompt--default "Write a one sentence summary about this article"
+(defcustom elfeed-curate-gptel-prompt--default "Briefly summarize:"
   "The gptel prompt about the current entry."
   :group 'elfeed-curate
   :type 'string)
@@ -489,6 +489,34 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
         ;;(message (format "elfeed-curate--url->text: Read %d bytes from %s" (length text) url))
         text))))
 
+(defun elfeed-curate--get-org-link ()
+  "Get link at point and return an org link of it."
+  (let* ((pos (point))
+         (url (get-text-property pos 'shr-url)))
+    (if (not url)
+        nil
+      (let* ((start (or (previous-single-property-change pos 'shr-url nil (point-min))
+                        (point-min)))
+             (end (or (next-single-property-change pos 'shr-url nil (point-max))
+                      (point-max)))
+             (text (buffer-substring-no-properties start end)))
+        (format "[[%s][%s]]" url text)))))
+
+;;;###autoload
+(defun elfeed-curate-get-link ()
+  "Get link at point and optionally open in the annotation editor.
+Use prefix key (`C-u`) to only copy the org link to the kill ring."
+  (interactive)
+  (let* ((org-link (elfeed-curate--get-org-link))
+        (ann (format "<%s (author) =comment=>" org-link)))
+    (if (not org-link)
+        (message "elfeed-curate-get-link: No link found at point.")
+      (progn
+        (kill-new org-link)
+        (if (null current-prefix-arg)
+            (elfeed-curate-edit-entry-annoation ann)
+          (message "elfeed-curate-get-link: Org link copied to the kill ring."))))))
+
 ;;;###autoload
 (defun elfeed-curate-ask-gptel (&optional user-prompt entry)
   "Prompt gptel with USER-PROMPT about the current ENTRY."
@@ -510,7 +538,7 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
          (text (elfeed-curate--url->text entry-link))
          (text (if (> (length text) elfeed-curate-url-content-length-max)
                    (substring text 0 elfeed-curate-url-content-length-max) text))
-         (prompt (format "%s:\n%s\n%s" user-prompt entry-title text)))
+         (prompt (format "%s\n%s\n%s" user-prompt entry-title text)))
     (when (= (length text) 0)
       (user-error (format "elfeed-curate-ask-gptel: Unable to get data from URL: %s" entry-link)))
     (gptel-request
@@ -524,7 +552,7 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
             (with-current-buffer out-buf
               (let ((inhibit-read-only t))
                 (erase-buffer)
-                (insert (format "Prompt: %s: %s\n%s\n\n" user-prompt entry-link entry-title))
+                (insert (format "Prompt: %s %s\n%s\n\n" user-prompt entry-link entry-title))
                 (insert response)
                 (special-mode)))
             (let ((win (display-buffer-in-side-window
@@ -573,13 +601,26 @@ This work in either the search or show buffer."
          (add-tag (not (memq elfeed-curate-star-tag (elfeed-curate-entry-tags entry)))))
     (elfeed-curate--update-tag entry elfeed-curate-star-tag add-tag)))
 
+(defun elfeed-curate--update-ann (current new)
+  "Create updated annotation base on CURRENT and NEW strings."
+  (let* ((nil-or-empty (lambda (v)
+                         (or (null v)
+                             (and (stringp v) (string= v "")))))
+         (append (if (funcall nil-or-empty new)
+                     ""
+                   (format "%s%s"
+                           (if (funcall nil-or-empty current) "" "\n")
+                           new))))
+    (format "%s%s" current append)))
+
 ;;;###autoload
-(defun elfeed-curate-edit-entry-annoation ()
-  "Edit selected entry annotation."
+(defun elfeed-curate-edit-entry-annoation (&optional new-annotation)
+  "Edit selected entry annotation with optional NEW-ANNOTATION appended."
   (interactive)
   (let* ((entry (elfeed-curate--get-entry))
          (current-annotation (elfeed-curate-get-entry-annotation entry))
-         (new-annotation (elfeed-curate-edit-annotation (elfeed-entry-title entry) current-annotation)))
+         (update-annoation (elfeed-curate--update-ann current-annotation new-annotation))
+         (new-annotation (elfeed-curate-edit-annotation (elfeed-entry-title entry) update-annoation)))
     (when (not (string-equal new-annotation current-annotation))
       (elfeed-curate-set-entry-annotation entry new-annotation))))
 

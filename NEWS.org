@@ -1,8 +1,9 @@
 #+TITLE: Changes
 
-*** 0.3.0 (2025-10-19)
+*** 0.3.0 (2025-10-25)
 
-- Add ask-gptel functionality
+- Add the ability to get create an annotation entry from a link in an entry buffer.
+- Add ask-gptel functionality (experimental).
   
 *** 0.2.1 (2023-11-18)
 
