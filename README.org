@@ -24,6 +24,15 @@ feed entries. The new functions available to support the curation workflow are:
   When an annotation is added a custom tag (=elfeed-curate-annotation-tag=,
   default is =ann=) is also added to the entry. This shows which entries have
   annotations in the search window and can also be used as a filter (=s +ann=).
+*** Ask gptel about an entry (experimental)
+- =elfeed-curate-ask-gptel= (=i= key) will first ask you to enter a prompt (see
+  =elfeed-curate-gptel-prompt--default=) and then prompt an LLM (see the
+  ﻿[[https://github.com/karthink/gptel/wiki/Defining-custom-gptel-commands][gptel-request API]]) with that text along with the link content. The response
+  will be displayed in the ~*ask-gptel*~ buffer and added to the kill ring.
+
+  The [[https://github.com/karthink/gptel][gptel]] backends and models are configured separately and can be changed as
+  desired. Testing =ask-gptel= was mostly done with ~ChatGPT:gpt-5~. Other backends and
+  models may not function properly.
 *** Entry selection
 - =elfeed-curate-toggle-star= (=m= key) is a convenience function that allows
   starring entries from the show buffer. See [[https://pragmaticemacs.wordpress.com/2016/09/16/star-and-unstar-articles-in-elfeed/][Star and unstar articles in elfeed]].
@@ -96,10 +105,13 @@ be bound as shown here:
   :ensure
   :bind (:map elfeed-search-mode-map
               ("a" . elfeed-curate-edit-entry-annoation)
-              ("x" . elfeed-curate-export-entries))
+              ("x" . elfeed-curate-export-entries)
+              ("i" . elfeed-curate-ask-gptel))
         (:map elfeed-show-mode-map
               ("a" . elfeed-curate-edit-entry-annoation)
               ("m" . elfeed-curate-toggle-star)
+              ("i" . elfeed-curate-ask-gptel)
+              ("j" . elfeed-curate-get-link)
               ("q" . kill-buffer-and-window)))
 #+end_src
 
@@ -120,9 +132,12 @@ be bound as shown here:
   (define-key elfeed-search-mode-map "a" #'elfeed-curate-edit-entry-annoation)
   (define-key elfeed-search-mode-map "x" #'elfeed-curate-export-entries)
   (define-key elfeed-search-mode-map "m" #'elfeed-curate-toggle-star)
+  (define-key elfeed-search-mode-map "i" #'elfeed-curate-ask-gptel)
 
   (define-key elfeed-show-mode-map   "a" #'elfeed-curate-edit-entry-annoation)
   (define-key elfeed-show-mode-map   "m" #'elfeed-curate-toggle-star)
+  (define-key elfeed-show-mode-map   "i" #'elfeed-curate-ask-gptel)
+  (define-key elfeed-show-mode-map   "j" #'elfeed-curate-get-link)
   (define-key elfeed-show-mode-map   "q" #'kill-buffer-and-window))
 #+end_src
 I had issues closing the show window after the annotation buffer was displayed
@@ -166,6 +181,12 @@ which group(s) the entry should be in. A link override example would typically
 look like this:
 
 <[[http://link_url][Link Name]] (Author Name) =Interesting stuff.=>
+
+If you put point on a link in the entry buffer, the =j= key
+(=elfeed-curate-get-link=) will automatically create a <text> entry and puts it in
+the annotation buffer for you to edit. It also puts the org link version of the
+link in the kill ring. Use prefix key (=C-u=) to only copy the org link to the
+kill ring.
 
 The following key combinations are used to exit the annotation buffer:
 
@@ -240,3 +261,5 @@ Here are the variables that can be customized:
 | =elfeed-curate-show-group-count=            | t                                                                          | Flag to enable showing the count of each group in the exported output. If a prefix argument is used before the export (=C-u x=), the count will not be shown. |
 | =elfeed-curate-hugo-base-dir=               | nil                                                                        | Base directory of the Hugo project. Used for 'md exports.                                                                                                     |
 | =elfeed-curate-hugo-section=                | "posts"                                                                    | Hugo section name. Posts will be written to elfeed-curate-hugo-base-dir/content/<section>.                                                                    |
+| =elfeed-curate-gptel-prompt--default=                                          | "Briefly summarize:"                                                                                                                          | Default ask-gptel prompt string.                                                                                                                              |
+| =elfeed-curate-url-content-length-max=                                                                             | 12000                                                                                                                       | Maximum number of characters sent to the gptel backend.                                                                                                       |
