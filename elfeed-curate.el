@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Robert Nadler <robert.nadler@gmail.com>
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "27.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
@@ -502,13 +502,83 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
              (text (buffer-substring-no-properties start end)))
         (format "[[%s][%s]]" url text)))))
 
+(defun elfeed-curate--extract-author-from-text (text)
+  "Best-effort extraction of an author/byline from TEXT."
+  (let ((case-fold-search t)
+        (author nil))
+    (cl-labels
+        ((clean (s)
+           (setq s (and s (string-trim (replace-regexp-in-string "[ \t\n\r]+" " " s))))
+           (when (and s (not (string= s "")))
+             ;; remove common leading tokens
+             (setq s (replace-regexp-in-string
+                      "\\=\\(?:by\\|author\\|written by\\|posted by\\)\\s-+"
+                      ""
+                      s))
+             ;; remove common trailing tokens
+             (setq s (replace-regexp-in-string
+                      "\\s-+\\(?:on\\|at\\|in\\)\\s-+.*\\'" ""
+                      s))
+             ;; avoid capturing obvious junk
+             (when (or (string-match-p "\\=https?://" s)
+                       (string-match-p "@\\|\\bsubscribe\\b\\|\\bnewsletter\\b\\|\\bcomments?\\b" s)
+                       (> (length s) 80))
+               (setq s nil)))
+           s))
+      ;; 1) Common patterns: "By NAME"
+      (unless author
+        (when (string-match
+               "\\b\\(?:by\\|written by\\|author\\)\\b\\s-*[:：]?\\s-*\\([[:upper:]][[:alpha:][:space:]'.-]+\\)"
+               text)
+          (setq author (clean (match-string 1 text)))))
+
+      ;; 2) Look for "By" near the start of the article
+      (unless author
+        (when (string-match
+               "\\=\\(?:.\\{0,800\\}\\)\\bby\\b\\s-+\\([[:upper:]][[:alpha:][:space:]'.-]+\\)\\b"
+               text)
+          (setq author (clean (match-string 1 text)))))
+
+      ;; 3) Try to extract from HTML meta tags (works even if TEXT is shr output, sometimes present)
+      (unless author
+        (when (string-match
+               "<meta[^>]+name=[\"']author[\"'][^>]+content=[\"']\\([^\"']+\\)[\"'][^>]*>"
+               text)
+          (setq author (clean (match-string 1 text)))))
+      author)))
+
+(defun elfeed-curate--org-link-url (org-link)
+  "Extract URL from ORG-LINK.
+ORG-LINK may be an Org bracket link \"[[URL][DESC]]\"."
+  (when (stringp org-link)
+    (cond
+     ;; [[URL][DESC]]
+     ((string-match "\\[\\[\\(.+\\)\\]\\[.*\\]\\]\\'" org-link)
+      (match-string 1 org-link))
+     ;; [[URL]]
+     ((string-match "\\[\\[\\(.+\\)\\]\\]\\'" org-link)
+      (match-string 1 org-link))
+     (t nil))))
+
+(defun elfeed-curate--author-from-org-link (org-link)
+  "Return a string (author) from the content at ORG-LINK."
+  (when org-link
+    (let ((url (elfeed-curate--org-link-url org-link)))
+      (when url
+        (let* ((text (elfeed-curate--url->text url))
+               (author (elfeed-curate--extract-author-from-text text)))
+          (message "%s (%d) %s" url (length text) author)
+          (when author
+            (substring-no-properties author)))))))
+
 ;;;###autoload
 (defun elfeed-curate-get-link ()
   "Get link at point and optionally open in the annotation editor.
 Use prefix key (`C-u`) to only copy the org link to the kill ring."
   (interactive)
   (let* ((org-link (elfeed-curate--get-org-link))
-        (ann (format "<%s (author) =comment=>" org-link)))
+         (author (elfeed-curate--author-from-org-link org-link))
+         (ann (format "<%s (%s) =comment=>" org-link author)))
     (if (not org-link)
         (message "elfeed-curate-get-link: No link found at point.")
       (progn
@@ -516,6 +586,8 @@ Use prefix key (`C-u`) to only copy the org link to the kill ring."
         (if (null current-prefix-arg)
             (elfeed-curate-edit-entry-annoation ann)
           (message "elfeed-curate-get-link: Org link copied to the kill ring."))))))
+
+;;(elfeed-curate--author-from-org-link "[[https://www.experimental-history.com/p/text-is-king][text is king]]")
 
 ;;;###autoload
 (defun elfeed-curate-ask-gptel (&optional user-prompt entry)
