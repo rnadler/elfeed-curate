@@ -458,36 +458,62 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
      ((string-equal system-type "berkeley-unix")
       (mapc (lambda (file-path) (let ((process-connection-type nil)) (start-process "" nil "xdg-open" file-path))) file-list)))))
 
-(defun elfeed-curate--url->text (url)
-  "Retrieve URL contents as text."
+(defun elfeed-curate--write-file (content src)
+  "Write CONTENT to a temporary file. SRC is the source of the content.
+This is for debugging."
+  (let* ((timestamp (format-time-string "%Y%m%d-%H%M%S"))
+         (tmpfile (expand-file-name (format "elfeed-curate-%s-%s.txt" src timestamp)
+                                        default-directory)))
+    (with-temp-file tmpfile
+      (insert content))
+    (message (format "Wrote %d bytes to %s" (length content) tmpfile)))
+  content)
+
+(defun elfeed-curate--url->text (url &optional write-file)
+  "Retrieve URL contents as text.
+Set WRITE-FILE to optionally write content to file.
+Return a cons cell (AUTHOR . TEXT) where AUTHOR is extracted from a
+<meta name=\"author\" content=\"...\"/> tag when present, otherwise nil."
   (let ((pop-up-windows nil)
         (inhibit-message t)
         (display-buffer-overriding-action '((display-buffer-no-window))))
     (save-window-excursion
       (let ((buf (url-retrieve-synchronously url t t 15))
+            author
             text)
-        (unless buf (error (concat "elfeed-curate--url->text: Failed to fetch URL: " url)))
+        (unless buf
+          (error (concat "elfeed-curate--url->text: Failed to fetch URL: " url)))
         (unwind-protect
             (with-current-buffer buf
               (goto-char (point-min))
               (unless (search-forward "\n\n" nil t)
                 (error (concat "elfeed-curate--url->text:: No HTTP body in URL:" url)))
-              (let* ((dom (and (fboundp 'libxml-parse-html-region)
-                               (libxml-available-p)
-                               (libxml-parse-html-region (point) (point-max)))))
-                    (setq text
-                          (string-trim
-                           (if dom
-                               (with-temp-buffer
-                                 (let ((shr-width 10000)
-                                       (shr-use-fonts nil)
-                                       (shr-inhibit-images t))
-                                   (shr-insert-document dom))
-                                 (buffer-string))
-                             (buffer-substring-no-properties (point) (point-max)))))))
+              (let ((body-start (point)))
+                (when write-file
+                  (elfeed-curate--write-file (buffer-substring-no-properties body-start (point-max)) "xt"))
+                  (goto-char body-start)
+                  (when (or (re-search-forward
+                             "<meta\\s-+name=[\"']author[\"']\\s-+content=[\"']\\([^\"']+\\)[\"'][^>]*>" nil t)
+                            (re-search-forward
+                             "<meta\\s-+property=[\"']og:site_name[\"']\\s-+content=[\"']\\([^\"']+\\)[\"'][^>]*>" nil t))
+                    (setq author (match-string-no-properties 1)))
+                  (let* ((dom (and (fboundp 'libxml-parse-html-region)
+                                   (libxml-available-p)
+                                 (libxml-parse-html-region body-start (point-max)))))
+                  (setq text
+                        (string-trim
+                         (if dom
+                             (with-temp-buffer
+                               (let ((shr-width 10000)
+                                     (shr-use-fonts nil)
+                                     (shr-inhibit-images t))
+                                 (shr-insert-document dom))
+                               (buffer-string))
+                           (buffer-substring-no-properties body-start (point-max))))))))
           (when (buffer-live-p buf) (kill-buffer buf)))
-        ;;(message (format "elfeed-curate--url->text: Read %d bytes from %s" (length text) url))
-        text))))
+        (when write-file
+          (elfeed-curate--write-file text "ut"))
+        (cons author text)))))
 
 (defun elfeed-curate--get-org-link ()
   "Get link at point and return an org link of it."
@@ -565,11 +591,17 @@ ORG-LINK may be an Org bracket link \"[[URL][DESC]]\"."
   (when org-link
     (let ((url (elfeed-curate--org-link-url org-link)))
       (when url
-        (let* ((text (elfeed-curate--url->text url))
-               (author (elfeed-curate--extract-author-from-text text)))
-          (message "%s (%d) %s" url (length text) author)
+        (let* ((author-text (elfeed-curate--url->text url))
+               (author (car author-text))
+               (text (cdr author-text))
+               (author (if author
+                           author
+                         (elfeed-curate--extract-author-from-text text))))
           (when author
             (substring-no-properties author)))))))
+
+;;(elfeed-curate--author-from-org-link "[[https://shiftmag.dev/state-of-code-2025-7978/][with author]]")
+;;(elfeed-curate--author-from-org-link "[[https://xeiaso.net/blog/2026/markdownlang/][no author]]")
 
 ;;;###autoload
 (defun elfeed-curate-get-link ()
@@ -586,8 +618,6 @@ Use prefix key (`C-u`) to only copy the org link to the kill ring."
         (if (null current-prefix-arg)
             (elfeed-curate-edit-entry-annoation ann)
           (message "elfeed-curate-get-link: Org link copied to the kill ring."))))))
-
-;;(elfeed-curate--author-from-org-link "[[https://www.experimental-history.com/p/text-is-king][text is king]]")
 
 ;;;###autoload
 (defun elfeed-curate-ask-gptel (&optional user-prompt entry)
@@ -607,7 +637,7 @@ Use prefix key (`C-u`) to only copy the org link to the kill ring."
   (let* ((entry-link (elfeed-entry-link entry))
          (authors-str (elfeed-curate--concat-authors entry))
          (entry-title (concat (elfeed-entry-title entry) authors-str))
-         (text (elfeed-curate--url->text entry-link))
+         (text (cdr (elfeed-curate--url->text entry-link)))
          (text (if (> (length text) elfeed-curate-url-content-length-max)
                    (substring text 0 elfeed-curate-url-content-length-max) text))
          (prompt (format "%s\n%s\n%s" user-prompt entry-title text)))
