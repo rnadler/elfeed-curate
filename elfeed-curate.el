@@ -469,6 +469,21 @@ This is for debugging."
     (message (format "Wrote %d bytes to %s" (length content) tmpfile)))
   content)
 
+(defun elfeed-curate--search-forward-author (key)
+  "Search forward for a <meta> tag that matches KEY and capture its content.
+KEY may be a string (meta attribute name/property value) or a list of strings."
+  (let ((keys (if (listp key) key (list key)))
+        (found nil))
+    (while (and keys (not found))
+      (let* ((k (car keys))
+             (re (concat
+                  "<meta\\s-+\\(?:name\\|property\\)=[\"']"
+                  (regexp-quote k)
+                  "[\"']\\s-+content=[\"']\\([^\"']+\\)[\"'][^>]*>")))
+        (setq found (re-search-forward re nil t)))
+      (setq keys (cdr keys)))
+    found))
+
 (defun elfeed-curate--url->text (url &optional write-file)
   "Retrieve URL contents as text.
 Set WRITE-FILE to optionally write content to file.
@@ -492,10 +507,7 @@ Return a cons cell (AUTHOR . TEXT) where AUTHOR is extracted from a
                 (when write-file
                   (elfeed-curate--write-file (buffer-substring-no-properties body-start (point-max)) "xt"))
                   (goto-char body-start)
-                  (when (or (re-search-forward
-                             "<meta\\s-+name=[\"']author[\"']\\s-+content=[\"']\\([^\"']+\\)[\"'][^>]*>" nil t)
-                            (re-search-forward
-                             "<meta\\s-+property=[\"']og:site_name[\"']\\s-+content=[\"']\\([^\"']+\\)[\"'][^>]*>" nil t))
+                  (when (elfeed-curate--search-forward-author '( "author" "article:author" "og:author" "DC.creator" "og:site_name"))
                     (setq author (match-string-no-properties 1)))
                   (let* ((dom (and (fboundp 'libxml-parse-html-region)
                                    (libxml-available-p)
@@ -600,8 +612,9 @@ ORG-LINK may be an Org bracket link \"[[URL][DESC]]\"."
           (when author
             (substring-no-properties author)))))))
 
-;;(elfeed-curate--author-from-org-link "[[https://shiftmag.dev/state-of-code-2025-7978/][with author]]")
+;;(elfeed-curate--author-from-org-link "[[https://shiftmag.dev/state-of-code-2025-7978/][with author and og:site_name]]")
 ;;(elfeed-curate--author-from-org-link "[[https://xeiaso.net/blog/2026/markdownlang/][no author]]")
+;;(elfeed-curate--author-from-org-link "[[https://www.hmpgloballearningnetwork.com/site/vdm/news/artificial-intelligence-advances-interventional-oncology-year-review][og:site_name only]]")
 
 ;;;###autoload
 (defun elfeed-curate-get-link ()
