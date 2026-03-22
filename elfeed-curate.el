@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Robert Nadler <robert.nadler@gmail.com>
 
 ;; Author: Robert Nadler <robert.nadler@gmail.com>
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "27.1") (elfeed "3.4.1"))
 ;; Keywords: news
 ;; URL: https://github.com/rnadler/elfeed-curate
@@ -458,36 +458,74 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
      ((string-equal system-type "berkeley-unix")
       (mapc (lambda (file-path) (let ((process-connection-type nil)) (start-process "" nil "xdg-open" file-path))) file-list)))))
 
-(defun elfeed-curate--url->text (url)
-  "Retrieve URL contents as text."
+(defun elfeed-curate--write-file (content src)
+  "Write CONTENT to a temporary file. SRC is the source of the content.
+This is for debugging."
+  (let* ((timestamp (format-time-string "%Y%m%d-%H%M%S"))
+         (tmpfile (expand-file-name (format "elfeed-curate-%s-%s.txt" src timestamp)
+                                        default-directory)))
+    (with-temp-file tmpfile
+      (insert content))
+    (message (format "Wrote %d bytes to %s" (length content) tmpfile)))
+  content)
+
+(defun elfeed-curate--search-forward-author (key)
+  "Search forward for a <meta> tag that matches KEY and capture its content.
+KEY may be a string (meta attribute name/property value) or a list of strings."
+  (let ((keys (if (listp key) key (list key)))
+        (found nil))
+    (while (and keys (not found))
+      (let* ((k (car keys))
+             (re (concat
+                  "<meta\\s-+\\(?:name\\|property\\)=[\"']"
+                  (regexp-quote k)
+                  "[\"']\\s-+content=[\"']\\([^\"']+\\)[\"'][^>]*>")))
+        (setq found (re-search-forward re nil t)))
+      (setq keys (cdr keys)))
+    found))
+
+(defun elfeed-curate--url->text (url &optional write-file)
+  "Retrieve URL contents as text.
+Set WRITE-FILE to optionally write content to file.
+Return a cons cell (AUTHOR . TEXT) where AUTHOR is extracted from a
+<meta name=\"author\" content=\"...\"/> tag when present, otherwise nil."
   (let ((pop-up-windows nil)
         (inhibit-message t)
         (display-buffer-overriding-action '((display-buffer-no-window))))
     (save-window-excursion
       (let ((buf (url-retrieve-synchronously url t t 15))
+            author
             text)
-        (unless buf (error (concat "elfeed-curate--url->text: Failed to fetch URL: " url)))
+        (unless buf
+          (error (concat "elfeed-curate--url->text: Failed to fetch URL: " url)))
         (unwind-protect
             (with-current-buffer buf
               (goto-char (point-min))
               (unless (search-forward "\n\n" nil t)
                 (error (concat "elfeed-curate--url->text:: No HTTP body in URL:" url)))
-              (let* ((dom (and (fboundp 'libxml-parse-html-region)
-                               (libxml-available-p)
-                               (libxml-parse-html-region (point) (point-max)))))
-                    (setq text
-                          (string-trim
-                           (if dom
-                               (with-temp-buffer
-                                 (let ((shr-width 10000)
-                                       (shr-use-fonts nil)
-                                       (shr-inhibit-images t))
-                                   (shr-insert-document dom))
-                                 (buffer-string))
-                             (buffer-substring-no-properties (point) (point-max)))))))
+              (let ((body-start (point)))
+                (when write-file
+                  (elfeed-curate--write-file (buffer-substring-no-properties body-start (point-max)) "xt"))
+                (goto-char body-start)
+                (when (elfeed-curate--search-forward-author '( "author" "article:author" "og:author" "DC.creator" "og:site_name"))
+                  (setq author (match-string-no-properties 1)))
+                (let* ((dom (and (fboundp 'libxml-parse-html-region)
+                                 (libxml-available-p)
+                                 (libxml-parse-html-region body-start (point-max)))))
+                  (setq text
+                        (string-trim
+                         (if dom
+                             (with-temp-buffer
+                               (let ((shr-width 10000)
+                                     (shr-use-fonts nil)
+                                     (shr-inhibit-images t))
+                                 (shr-insert-document dom))
+                               (buffer-string))
+                           (buffer-substring-no-properties body-start (point-max))))))))
           (when (buffer-live-p buf) (kill-buffer buf)))
-        ;;(message (format "elfeed-curate--url->text: Read %d bytes from %s" (length text) url))
-        text))))
+        (when write-file
+          (elfeed-curate--write-file text "ut"))
+        (cons author text)))))
 
 (defun elfeed-curate--get-org-link ()
   "Get link at point and return an org link of it."
@@ -502,13 +540,90 @@ Simplified version of: <http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_
              (text (buffer-substring-no-properties start end)))
         (format "[[%s][%s]]" url text)))))
 
+(defun elfeed-curate--extract-author-from-text (text)
+  "Best-effort extraction of an author/byline from TEXT."
+  (let ((case-fold-search t)
+        (author nil))
+    (cl-labels
+        ((clean (s)
+           (setq s (and s (string-trim (replace-regexp-in-string "[ \t\n\r]+" " " s))))
+           (when (and s (not (string= s "")))
+             ;; remove common leading tokens
+             (setq s (replace-regexp-in-string
+                      "\\=\\(?:by\\|author\\|written by\\|posted by\\)\\s-+"
+                      ""
+                      s))
+             ;; remove common trailing tokens
+             (setq s (replace-regexp-in-string
+                      "\\s-+\\(?:on\\|at\\|in\\)\\s-+.*\\'" ""
+                      s))
+             ;; avoid capturing obvious junk
+             (when (or (string-match-p "\\=https?://" s)
+                       (string-match-p "@\\|\\bsubscribe\\b\\|\\bnewsletter\\b\\|\\bcomments?\\b" s)
+                       (> (length s) 80))
+               (setq s nil)))
+           s))
+      ;; 1) Common patterns: "By NAME"
+      (unless author
+        (when (string-match
+               "\\b\\(?:by\\|written by\\|author\\)\\b\\s-*[:：]?\\s-*\\([[:upper:]][[:alpha:][:space:]'.-]+\\)"
+               text)
+          (setq author (clean (match-string 1 text)))))
+
+      ;; 2) Look for "By" near the start of the article
+      (unless author
+        (when (string-match
+               "\\=\\(?:.\\{0,800\\}\\)\\bby\\b\\s-+\\([[:upper:]][[:alpha:][:space:]'.-]+\\)\\b"
+               text)
+          (setq author (clean (match-string 1 text)))))
+
+      ;; 3) Try to extract from HTML meta tags (works even if TEXT is shr output, sometimes present)
+      (unless author
+        (when (string-match
+               "<meta[^>]+name=[\"']author[\"'][^>]+content=[\"']\\([^\"']+\\)[\"'][^>]*>"
+               text)
+          (setq author (clean (match-string 1 text)))))
+      author)))
+
+(defun elfeed-curate--org-link-url (org-link)
+  "Extract URL from ORG-LINK.
+ORG-LINK may be an Org bracket link \"[[URL][DESC]]\"."
+  (when (stringp org-link)
+    (cond
+     ;; [[URL][DESC]]
+     ((string-match "\\[\\[\\(.+\\)\\]\\[.*\\]\\]\\'" org-link)
+      (match-string 1 org-link))
+     ;; [[URL]]
+     ((string-match "\\[\\[\\(.+\\)\\]\\]\\'" org-link)
+      (match-string 1 org-link))
+     (t nil))))
+
+(defun elfeed-curate--author-from-org-link (org-link)
+  "Return a string (author) from the content at ORG-LINK."
+  (when org-link
+    (let ((url (elfeed-curate--org-link-url org-link)))
+      (when url
+        (let* ((author-text (elfeed-curate--url->text url))
+               (author (car author-text))
+               (text (cdr author-text))
+               (author (if author
+                           author
+                         (elfeed-curate--extract-author-from-text text))))
+          (when author
+            (substring-no-properties author)))))))
+
+;;(elfeed-curate--author-from-org-link "[[https://shiftmag.dev/state-of-code-2025-7978/][with author and og:site_name]]")
+;;(elfeed-curate--author-from-org-link "[[https://xeiaso.net/blog/2026/markdownlang/][no author]]")
+;;(elfeed-curate--author-from-org-link "[[https://www.hmpgloballearningnetwork.com/site/vdm/news/artificial-intelligence-advances-interventional-oncology-year-review][og:site_name only]]")
+
 ;;;###autoload
 (defun elfeed-curate-get-link ()
   "Get link at point and optionally open in the annotation editor.
 Use prefix key (`C-u`) to only copy the org link to the kill ring."
   (interactive)
   (let* ((org-link (elfeed-curate--get-org-link))
-        (ann (format "<%s (author) =comment=>" org-link)))
+         (author (elfeed-curate--author-from-org-link org-link))
+         (ann (format "<%s (%s) =comment=>" org-link author)))
     (if (not org-link)
         (message "elfeed-curate-get-link: No link found at point.")
       (progn
@@ -535,7 +650,7 @@ Use prefix key (`C-u`) to only copy the org link to the kill ring."
   (let* ((entry-link (elfeed-entry-link entry))
          (authors-str (elfeed-curate--concat-authors entry))
          (entry-title (concat (elfeed-entry-title entry) authors-str))
-         (text (elfeed-curate--url->text entry-link))
+         (text (cdr (elfeed-curate--url->text entry-link)))
          (text (if (> (length text) elfeed-curate-url-content-length-max)
                    (substring text 0 elfeed-curate-url-content-length-max) text))
          (prompt (format "%s\n%s\n%s" user-prompt entry-title text)))
