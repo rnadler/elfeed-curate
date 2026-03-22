@@ -29,7 +29,7 @@ feed entries. The new functions available to support the curation workflow are:
   =elfeed-curate-gptel-prompt--default=) and then prompt an LLM (see the
   ﻿[[https://github.com/karthink/gptel/wiki/Defining-custom-gptel-commands][gptel-request API]]) with that text along with the link content. The response
   will be displayed in the ~*ask-gptel*~ buffer and added to the kill ring. See
-  [[https://bobonmedicaldevicesoftware.com/blog/2025/10/27/elfeed-curate-update-two-new-features/?_gl=1*l7nn8w*_ga*MjAzNTIyNjIxNS4xNzQ1MjUyMTc3*_ga_B2ECNGHWZ6*czE3NzQyMTM5NTAkbzQ5JGcwJHQxNzc0MjEzOTUwJGo2MCRsMCRoMA..][Elfeed Curate Update: Two new features]] for details.
+  [[https://bobonmedicaldevicesoftware.com/blog/2025/10/27/elfeed-curate-update-two-new-features/][Elfeed Curate Update: Two new features]] for details.
 
   The [[https://github.com/karthink/gptel][gptel]] backends and models are configured separately and can be changed as
   desired. Testing =ask-gptel= was mostly done with ~ChatGPT:gpt-5~. Other backends and
