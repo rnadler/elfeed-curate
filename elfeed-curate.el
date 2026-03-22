@@ -506,11 +506,11 @@ Return a cons cell (AUTHOR . TEXT) where AUTHOR is extracted from a
               (let ((body-start (point)))
                 (when write-file
                   (elfeed-curate--write-file (buffer-substring-no-properties body-start (point-max)) "xt"))
-                  (goto-char body-start)
-                  (when (elfeed-curate--search-forward-author '( "author" "article:author" "og:author" "DC.creator" "og:site_name"))
-                    (setq author (match-string-no-properties 1)))
-                  (let* ((dom (and (fboundp 'libxml-parse-html-region)
-                                   (libxml-available-p)
+                (goto-char body-start)
+                (when (elfeed-curate--search-forward-author '( "author" "article:author" "og:author" "DC.creator" "og:site_name"))
+                  (setq author (match-string-no-properties 1)))
+                (let* ((dom (and (fboundp 'libxml-parse-html-region)
+                                 (libxml-available-p)
                                  (libxml-parse-html-region body-start (point-max)))))
                   (setq text
                         (string-trim
